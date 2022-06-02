@@ -1,0 +1,62 @@
+Steps to automate change management vendor tickets:
+
+ 1 - Take an email or emails as input
+	a. Find if there are any unprovided emails associated to the vendor number.
+	b. Adjust input accordingly.
+	c. Pull all information such as, circuit ids, start date, end date, region, type of work, outage duration.
+	d. Store into standardized data file, temp_data.json
+
+ 2 - Take temp_data.json as inferred input, check to make sure {MAINT_ID} is not found by Adhoc Search and initialize the GCR frame.
+
+ 3 - Complete first frame in GCR Console.
+	a. Pull region, toggle BPMS to hard state NO.
+	b. Write generic description: "Vendor - {VNDR_NAME} - {MAINT_DESC}\nOutage: {MAINT_OUTAGE_NUM} {MAINT_OUTAGE_UNT}"
+	c. Update Implementor Group to CHNGCOORD
+	d. Update Vendor Name: to {VNDR_NAME}
+	e. Update Vendor Maint. ID: to {MAINT_ID} / {APPL_CHILD}
+	f.  Update Vendor Request Recd: to {EMAIL_REC}
+
+ 4 - Move to Locations and Windows tab.
+	a. In Locations, Under Non-Site location of work, open Add Location
+	b. Update City to {MAINT_CITY}, Update State to {MAINT_STATE} (Could be null if international ticket), Update Country to {MAINT_COUNTRY}
+	c. In Windows, open Add Window
+	d. Update Start Date to {MAINT_START}, Update End Date to {MAINT_END}, Toggle all applicable locations.
+
+ 5a - Open CIIT Application / Have User confirm a live window of CIIT is open.
+ 5b - Move to CIIT Application.
+	a. Update Circuit ID(s) with {CRCT_LIST} (Filtered)
+	b. Toggle Refinement to YES
+	c. Press Confirm.
+	d. Press Export, Store to {CRCT_RSLT}
+	e. Press Generate Impact
+	f. Right Click first circuit in impact results, and press GCR Impact Generation, Press OK on Warning Box
+
+ 6. Move back to OpsConsole and GCR Console. Move to Affected Objects tab.
+	a. Open Add Affected Objects
+	b. Toggle Object Type to Vendor
+	c. Update Legacy Network to {LEGACY_NET} (Search for words like Level3, else and in default case, return CenturyLink)
+	d. Select all applicable Maintenance Windows
+	e. Update Protected Outage Duration to {MAINT_OUTAGE_NUM}, and {MAINT_OUTAGE_UNT} accordingly.
+	e. Update Unprotected Outage Duration to {MAINT_OUTAGE_NUM}, and {MAINT_OUTAGE_UNT} accordingly.
+	f.  Update Affected Objects to {CRCT_RSLT}
+
+ 7. Schedule GCR and move back into edit mode.
+	a. Grab GCR ID and assign to {GCR_ID}
+
+ 8. Open excel spreadsheet and clean results.
+	a. Save Excel sheet in directory: PARENT//{GCR_ID}// with file name provided, but append "_{GCR_ID}_RAW" and change file format to ".xlsx"
+	b. Save Excel sheet in directory: PARENT//{GCR_ID}// with file name provided, but replace raw file name with "_{GCR_ID}_CLEAN" and change file format to ".xlsx"
+	c. Complete Project Clear.
+
+ 9. Move back to OpsConsole and GCR Console. Move to Service Impacts tab.
+	a. Click Import Impacts, Navigate to directory: PARENT//{GCR_ID}// and attach the cleaned excel document.
+	b. Toggle Impacts Reviewed to YES
+
+ 10. Move to Documents tab, and attach all files contained in PARENT//{GCR_ID}// including .LOG file with ferbose output.
+
+ 11. Save Ticket, and Schedule to Pending Notification Status, Accept Ticket, Pull All Contacts, Go back to Edit Mode, and Move to Notifications tab.
+	a. Write generic description with Notification Generator using {MAINT_DESC} and {MAINT_START}, Find best appropriate response.
+
+ 12. For now, wait for review, before submission.
+
+ 13. (Future) In Notifications tab, Toggle Notifications Reviewed and Validate Email Sent to YES, Save Ticket, Schedule to Scheduled Status.

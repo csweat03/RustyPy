@@ -1,0 +1,20 @@
+Hi reader,
+
+This is Rusty (Version BETA). A partially aware AI-powered program. 
+He will introduce himself one day, but if we let him do that now, I wouldn't have a job!
+
+You will notice, a few different files. You have your scripting and programming files, as well as config.
+
+This project was made on a Java 8 backbone. (What is that? Like 8 versions behind the latest stable at this point?)
+Using Java for Task Scheduling, GUI Integration, and Python 3 for Tasks and ML Integration, Config files using JSON, and TXT.
+
+------------------------- BEGIN DEVELOPMENT LOG -------------------------
+
+5/26/22	: Wrote out the framework of the project and created this README!
+		: Created pull_email.py, tested a few cases, read .MSG, processed into .LOG
+		: (NEXT) Resolve email into specific cases, write to pointers.json
+		: 
+		: 
+		: 
+		: 
+

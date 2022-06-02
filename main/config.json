@@ -1,0 +1,11 @@
+{	
+	"input_fldr": "input",
+	"output_fldr": "output",
+	"tasks_fldr": "tasks",
+	
+	"log": "output\\log.txt",
+	"pointers": "output\\pointers.json",
+	
+	"pull_email": "tasks\\pull_email.py"
+	
+}
