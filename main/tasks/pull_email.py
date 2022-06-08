@@ -1,73 +1,8 @@
 import os
-import json
 import datetime
 import time
+from .utils.wrapper import *
 import win32com.client # pip install -U pypiwin32
-
-from screeninfo import get_monitors # pip install screeninfo
-from pynput.mouse import Button, Controller as ControlMouse, Listener
-from pynput.keyboard import Key, Controller as ControlKeybd
-
-parent_fldr = os.path.dirname(os.getcwd()) + "\\"
-config = json.loads(open(parent_fldr + "config.json", "r").read())
-
-input_fldr = parent_fldr + config["input_fldr"]
-log_file = parent_fldr + config["log"]
-pointers = parent_fldr + config["pointers"]
-
-email_tuple = ()
-local_pointers = {
-    'VNDR_NAME': "",
-    'MAINT_ID': "",
-    'MAINT_TYPE': "",
-    'MAINT_DESC': "",
-    'MAINT_DATE_REC': "",
-    'MAINT_HOUR_REC': "",
-    'MAINT_MIN_REC': "",
-    'MAINT_OUTAGE_NUM': "",
-    'MAINT_OUTAGE_UNT': "",
-    # 'MAINT_CITY': "",
-    # 'MAINT_STATE': "",
-    # 'MAINT_PRIM_START_DATE': "",
-    # 'MAINT_PRIM_END_DATE': "",
-    # 'MAINT_PRIM_START_HOUR': "",
-    # 'MAINT_PRIM_END_HOUR': "",
-    # 'MAINT_PRIM_START_MIN': "",
-    # 'MAINT_PRIM_END_MIN': "",
-    # 
-    # 'MAINT_BACK_START_DATE': "",
-    # 'MAINT_BACK_END_DATE': "",
-    # 'MAINT_BACK_START_HOUR': "",
-    # 'MAINT_BACK_END_HOUR': "",
-    # 'MAINT_BACK_START_MIN': "",
-    # 'MAINT_BACK_END_MIN': "",
-    # 'CRCT_LIST': "",
-    # 'CRCT_RSLT': ""
-}
-
-type_four = {
-    "config change": 1,
-    "decommision": 2,
-    "hardware replacement": 3,
-    "hardware upgrade": 4,
-    "maintenance": 5,
-    "migration": 6,
-    "node insert": 7,
-    "software upgrade": 8,
-    "splice\\relocation": 9,
-    "troubleshoot alarm": 10
-}
-
-display_list = []
-macro_steps = []
-
-mouse = ControlMouse()
-keybd = ControlKeybd()
-
-def log(str):
-    with open(log_file, 'a') as log:
-        msg = "[" + datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S") + "]: " + str + "\n"
-        log.write(msg)
         
 def read_message(absolute_file):
     outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
@@ -81,7 +16,7 @@ def extract_email_tuple():
         log("Found file: " + f)
         msg = read_message(input_fldr + "\\" + file.name)
 
-        mail_sent_on = msg.SentOn.strftime("%m/%d/%Y, %H:%M:%S")
+        mail_sent_on = msg.SentOn.strftime("%Y/%m/%d/%H/%M/%S")
         mail_subject = msg.Subject.strip()
         mail_content = []
 
@@ -97,213 +32,109 @@ def extract_email_tuple():
         return (mail_sent_on, mail_subject, mail_content)
 
 def populate_pointers(email_tuple):
-    #temporary manual entry, would like to replace with AI/ML in the future
-    for pointer in local_pointers:
-        local_pointers[pointer] = input("Enter this pointer's value " + pointer + ":  ")
+# Vendor Name
+    for vendor in vendors:
+        for word in email_tuple[1].lower().split(" "):
+            passed = word.lower().strip() == vendor.lower().strip()
+
+            if passed:
+                log("Found Vendor Name in Mail Subject: " + vendor)
+                print("Vendor Name: " + vendor)
+                local_pointers["VNDR_NAME"] = vendor
+    
+    if local_pointers["VNDR_NAME"] == "": 
+        local_pointers["VNDR_NAME"] = input("Enter the vendor name:  ")
+
+# Maintenance ID
+    for word in email_tuple[1].split():
+        if word.startswith("CHG") or word.startswith("CRQ") or word.startswith("#") or word.startswith("CM"):
+            log("Found Maintenance ID in Mail Subject: " + word)
+            print("Maintenance ID: " + word)
+            local_pointers["MAINT_ID"] = str(word)
+        else:
+            potential = [int(s) for s in word.split() if s.isdigit()]
+            if potential == None or potential == "": continue
+            if len(potential) <= 3 or potential is datetime.datetime.today().year: continue
+
+            use_potential = input("Potential Maintenance ID: " + potential + ", use this? Yes or No")
+
+            if use_potential.lower() == "yes": local_pointers["MAINT_ID"] = str(potential)
+            else: local_pointers["MAINT_ID"] = input("Enter the maintenance ID:  ")
+
+    if local_pointers["MAINT_ID"] == "": local_pointers["MAINT_ID"] = input("Enter the maintenance ID:  ")
+
+# Maintenance Description
+# Find a way to effectively assume the description.
+    # action_words = ["summary", "description", ""]
+    # for line in email_tuple[2]:
+
+    local_pointers["MAINT_DESC"] = input("Enter the maintenance description:  ")
+
+# Maintenance Type
+    for type in type_four:
+        if type in local_pointers["MAINT_DESC"]:
+            use_potential = input("Potential Maintenance Type: " + type + ", use this? Yes or No:  ")
+
+            if use_potential.lower() == "yes": local_pointers["MAINT_TYPE"] = type
+            else: local_pointers["MAINT_ID"] = input("Enter the maintenance type:\n\tOptions: " + str(type_four).replace("'", "").replace("[", "").replace("]", "").replace("\\\\", "\\") + ".\n\t ::  ")
+
+    if local_pointers["MAINT_TYPE"] == "": local_pointers["MAINT_TYPE"] = input("Enter the maintenance type:\n\tOptions: " + str(type_four).replace("'", "").replace("[", "").replace("]", "").replace("\\\\", "\\") + ".\n\t ::  ")
+
+# Maintenance Received
+    dt = email_tuple[0].split("/")
+    print("Date Recieved has been located.")
+    local_pointers["MAINT_DATE_REC"] = "-".join(dt[0:3])
+    local_pointers["MAINT_HOUR_REC"] = dt[3]
+    local_pointers["MAINT_MIN_REC"] = dt[4]
+
+# Outage Duration
+    
+    outage = input("Enter the outage duration (6 hours, 30 minutes, etc):  ").split(" ")
+    local_pointers["MAINT_OUTAGE_NUM"] = outage[0].strip()
+    local_pointers["MAINT_OUTAGE_UNT"] = outage[1].strip()
+
+# Work Location
+    location = input("Enter the location of work (Norcross, GA; Broomfield, CO):  ").split(",")
+    local_pointers["MAINT_CITY"] = location[0].strip()
+    local_pointers["MAINT_STATE"] = location[1].strip()
+
+# Primary Maintenance Date
+    prim_maint_date = input("Enter the primary maintenance date in EST (YYYY-MM-DD HH:MM to YYYY-MM-DD HH:MM):  ").split(" to ")
+    start_datetime = prim_maint_date[0].strip().split(" ")
+    start_time = start_datetime[1].strip().split(":")
+
+    local_pointers["MAINT_PRIM_START_DATE"] = start_datetime[0].strip()
+    local_pointers["MAINT_PRIM_START_HOUR"] = start_time[0]
+    local_pointers["MAINT_PRIM_START_MIN"] = start_time[1]
+
+    end_datetime = prim_maint_date[1].strip().split(" ")
+    end_time = end_datetime[1].strip().split(":")
+
+    local_pointers["MAINT_PRIM_END_DATE"] = end_datetime[0].strip()
+    local_pointers["MAINT_PRIM_END_HOUR"] = end_time[0]
+    local_pointers["MAINT_PRIM_END_MIN"] = end_time[1]
+
+# Backup Maintenance Date
+    has_backup_date = input("Is there a backup night on file? If there is type 'yes':  ")
+    if "yes" in has_backup_date.lower():
+            back_maint_date = input("Enter the backup maintenance date in EST (YYYY/MM/DD HH:MM - YYYY/MM/DD HH:MM):  ").split("-")
+            start_datetime = back_maint_date[0].strip().split(" ")
+            start_time = start_datetime[1].strip().split(":")
+
+            local_pointers["MAINT_BACK_START_DATE"] = start_datetime[0].strip()
+            local_pointers["MAINT_BACK_START_HOUR"] = start_time[0]
+            local_pointers["MAINT_BACK_START_MIN"] = start_time[1]
+
+            end_datetime = back_maint_date[1].strip().split(" ")
+            end_time = end_datetime[1].strip().split(":")
+
+            local_pointers["MAINT_BACK_END_DATE"] = end_datetime[0].strip()
+            local_pointers["MAINT_BACK_END_HOUR"] = end_time[0]
+            local_pointers["MAINT_BACK_END_MIN"] = end_time[1]
 
     print("All information should have been recieved correctly. The script will run in 5 seconds. Please bring up an empty GCR shell.")
     time.sleep(6)
 
-def press_key(key):
-    keybd.press(key)
-    keybd.release(key)
-
-def macro_key(key, index):
-    i = 0
-    while i < index:
-        i += 1
-        press_key(key)
-
-def press_tab():
-    press_key(Key.tab)
-
-def type_text(text):
-    keybd.type(text)
-
-def get_keyboard_operation(input, option_list):
-    index = option_list[str(input).lower()]
-    macro_key(Key.down, index)
-
-def build_gcr():
-    with Listener(on_click=on_click) as listener:
-        listener.join()
-
-def find_monitor(x, y):
-    for display in display_list:
-        if (display.x > x): continue
-        if (display.x + display.width < x): continue
-        return display
-
-def on_click(x, y, button, pressed):
-    if (pressed != True): return
-
-    monitor = find_monitor(x, y)
-
-    x -= monitor.x
-    y -= monitor.y
-
-    x = (x - monitor.x) / (monitor.width)
-    y = (y - monitor.y) / (monitor.height)
-
-    if (button == Button.left):
-        macro_steps.append(str(x)+","+str(y))
-    if (button == Button.right):
-        print(monitor)
-        macro_steps.append("PAUSE")
-    if (button == Button.middle):
-        print(macro_steps)
-        return False
-
-
-running = "no"
-unpause = ""
-
-while running != "run":
-    running = input("Put all email files inside the folder labeled \" \\input\\ \", type RUN and press ENTER when done:  ").lower()
-
-for m in get_monitors():
-        display_list.append(m)
-    
-# email_tuple = extract_email_tuple()
-populate_pointers(None)
-press_key("c")
-time.sleep(3)
-press_tab()
-macro_key('s', 8)
-press_tab()
-press_key('v')
-press_tab()
-press_key('n')
-press_tab()
-press_key('v')
-press_tab()
-press_key('t')
-press_tab()
-get_keyboard_operation(local_pointers["MAINT_TYPE"], type_four)
-press_tab()
-press_key('o')
-press_key(Key.enter)
-macro_key(Key.tab, 3)
-press_key(Key.up)
-press_key(Key.enter)
-time.sleep(1)
-macro_key(Key.tab, 8)
-press_key(Key.down)
-press_tab()
-
-while (unpause.upper() != "OK"):
-    unpause = input("Select the vendor from the Vendor Name field and type OK when done: ")
-unpause = ""
-
-time.sleep(3)
-
-press_tab()
-type_text(local_pointers["MAINT_ID"])
-press_tab()
-type_text(local_pointers["MAINT_DATE_REC"])
-macro_key(Key.tab, 2)
-type_text(local_pointers["MAINT_HOUR_REC"])
-ampm = "P" if int(local_pointers["MAINT_HOUR_REC"]) >= 12 else "A"
-press_key(Key.right)
-type_text(local_pointers["MAINT_MIN_REC"])
-press_key(Key.right)
-press_key(Key.right)
-press_key(ampm)
-press_tab()
-type_text("Vendor - " + local_pointers["VNDR_NAME"] + " - " + local_pointers["MAINT_DESC"])
-macro_key(Key.enter, 2)
-type_text("Outage: " + local_pointers["MAINT_OUTAGE_NUM"] + " " + local_pointers["MAINT_OUTAGE_UNT"])
-with keybd.pressed(Key.shift):
-    macro_key(Key.tab, 14)
-macro_key(Key.right, 2)
-# macro_key(Key.tab, 5)
-# press_key(Key.enter)
-# macro_key(Key.tab, 2)
-# type_text(local_pointers["MAINT_CITY"])
-# press_tab()
-# type_text(local_pointers["MAINT_STATE"])
-# macro_key(Key.tab, 2)
-
-# while (unpause.upper() != "OK"):
-#     unpause = input("Select the country from the Country field and type OK when done: ")
-# unpause = ""
-
-# time.sleep(3)
-
-# press_key(Key.enter)
-# with keybd.pressed(Key.shift):
-#     macro_key(Key.tab, 5)
-# macro_key(Key.right, 1)
-# macro_key(Key.tab, 2)
-# press_key(Key.enter)
-
-# time.sleep(3)
-
-# macro_key(Key.tab, 2)
-# with keybd.pressed(Key.ctrl_l):
-#     press_key("a")
-# type_text(local_pointers["MAINT_PRIM_START_DATE"])
-# macro_key(Key.tab, 2)
-# type_text(local_pointers["MAINT_PRIM_START_HOUR"])
-# ampm = "P" if int(local_pointers["MAINT_PRIM_START_HOUR"]) >= 12 else "A"
-# press_key(Key.right)
-# type_text(local_pointers["MAINT_PRIM_START_MIN"])
-# press_key(Key.right)
-# press_key(Key.right)
-# press_key(ampm)
-# press_tab()
-# # 
-# with keybd.pressed(Key.ctrl_l):
-#     press_key("a")
-# type_text(local_pointers["MAINT_PRIM_END_DATE"])
-# macro_key(Key.tab, 2)
-# type_text(local_pointers["MAINT_PRIM_END_HOUR"])
-# ampm = "P" if int(local_pointers["MAINT_PRIM_END_HOUR"]) >= 12 else "A"
-# press_key(Key.right)
-# type_text(local_pointers["MAINT_PRIM_END_MIN"])
-# press_key(Key.right)
-# press_key(Key.right)
-# press_key(ampm)
-# macro_key(Key.tab, 7)
-# press_key(Key.space)
-# press_key(Key.enter)
-
-# if (len(local_pointers["MAINT_BACK_START_DATE"]) > 5):
-#     press_key(Key.enter)
-#     time.sleep(3)
-
-#     macro_key(Key.tab, 2)
-#     with keybd.pressed(Key.ctrl_l):
-#         press_key("a")
-#     type_text(local_pointers["MAINT_BACK_START_DATE"])
-#     macro_key(Key.tab, 2)
-#     type_text(local_pointers["MAINT_BACK_START_HOUR"])
-#     ampm = "P" if int(local_pointers["MAINT_BACK_START_HOUR"]) >= 12 else "A"
-#     press_key(Key.right)
-#     type_text(local_pointers["MAINT_BACK_START_MIN"])
-#     press_key(Key.right)
-#     press_key(Key.right)
-#     press_key(ampm)
-#     press_tab()
-#     # 
-#     with keybd.pressed(Key.ctrl_l):
-#         press_key("a")
-#     type_text(local_pointers["MAINT_BACK_END_DATE"])
-#     macro_key(Key.tab, 2)
-#     type_text(local_pointers["MAINT_BACK_END_HOUR"])
-#     ampm = "P" if int(local_pointers["MAINT_BACK_END_HOUR"]) >= 12 else "A"
-#     press_key(Key.right)
-#     type_text(local_pointers["MAINT_BACK_END_MIN"])
-#     press_key(Key.right)
-#     press_key(Key.right)
-#     press_key(ampm)
-#     macro_key(Key.tab, 5)
-#     press_key(Key.up)
-#     macro_key(Key.tab, 2)
-#     press_key(Key.space)
-#     press_key(Key.enter)
-
-
-
-
-# build_gcr()
+def _exec():
+    email_tuple = extract_email_tuple()
+    populate_pointers(email_tuple)
