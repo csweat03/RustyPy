@@ -1,2 +1,2 @@
 # RustyPy
-Rusty(Py) is a project, that is meant to provide a suite of tools for OpsConsole
+Rusty(Py) is a project, that is meant to automate the production of Vendor GCRs for OpsConsole.
