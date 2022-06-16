@@ -3,8 +3,19 @@ import json
 import datetime
 import time
 
+import dateparser
+
+import nltk
+from nltk.corpus import stopwords, wordnet
+from nltk.tokenize import word_tokenize, sent_tokenize
+nltk.download('stopwords')
+nltk.download('omw-1.4')
+nltk.download('punkt')
+print("\n")
+
 from pynput.mouse import Controller as ControlMouse
 from pynput.keyboard import Key, Controller as ControlKeybd
+from difflib import SequenceMatcher
 
 mouse = ControlMouse()
 keybd = ControlKeybd()
@@ -15,37 +26,28 @@ config = json.loads(open(parent_fldr + "config.json", "r").read())
 speed_multiplier = float(config["speed_multiplier"])
 
 input_fldr = parent_fldr + config["input_fldr"]
-log_file = parent_fldr + config["log"]
+storage_fldr = parent_fldr + config["storage_fldr"]
+
 pointers = parent_fldr + config["pointers"]
 
 email_tuple = ()
-local_pointers = {
-    'VNDR_NAME': "",
-    'MAINT_ID': "",
-    'MAINT_TYPE': "",
-    'MAINT_DESC': "",
-    'MAINT_DATE_REC': "",
-    'MAINT_HOUR_REC': "",
-    'MAINT_MIN_REC': "",
-    'MAINT_OUTAGE_NUM': "",
-    'MAINT_OUTAGE_UNT': "",
-    'MAINT_CITY': "",
-    'MAINT_STATE': "",
-    'MAINT_PRIM_START_DATE': "",
-    'MAINT_PRIM_END_DATE': "",
-    'MAINT_PRIM_START_HOUR': "",
-    'MAINT_PRIM_END_HOUR': "",
-    'MAINT_PRIM_START_MIN': "",
-    'MAINT_PRIM_END_MIN': "",
-    # 
-    'MAINT_BACK_START_DATE': "",
-    'MAINT_BACK_END_DATE': "",
-    'MAINT_BACK_START_HOUR': "",
-    'MAINT_BACK_END_HOUR': "",
-    'MAINT_BACK_START_MIN': "",
-    'MAINT_BACK_END_MIN': "",
-    # 'CRCT_LIST': "",
-    # 'CRCT_RSLT': ""
+
+internal_pointers = {
+    "VENDOR_NAME": "",
+    "IDENTIFIERS": [],
+    "MAINTENANCE_DETAILS": {
+        # Auto-populated from mail
+        "received": [],
+
+        "description": "",
+        "category": "",
+        # duration, units
+        "outage": [],
+
+        "location": [],
+        # window dates, window times, alternate night
+        "windows": [],
+    }
 }
 
 categories = [
@@ -82,12 +84,100 @@ time_units = [
     "hours"
 ]
 
-vendors = config["vendors"]
+def get_synonym_list(base):
+    syn = []
+    for pot in wordnet.synsets(base):
+        for i in pot.lemmas():
+            syn.append(i.name())
+
+    return syn
+
+# Completely ripped from GeeksForGeeks
+def summarize_text(input, magnitude):
+    stopWords = set(stopwords.words("english"))
+    words = word_tokenize(input)
+
+    freqTable = dict()
+    for word in words:
+        word = word.lower()
+        if word in stopWords:
+            continue
+        if word in freqTable:
+            freqTable[word] += 1
+        else:
+            freqTable[word] = 1
+
+    sentences = sent_tokenize(input)
+    sentenceValue = dict()
+   
+    for sentence in sentences:
+        for word, freq in freqTable.items():
+            if word in sentence.lower():
+                if sentence in sentenceValue:
+                    sentenceValue[sentence] += freq
+                else:
+                    sentenceValue[sentence] = freq
+
+    sumValues = 0
+    for sentence in sentenceValue:
+        sumValues += sentenceValue[sentence]
+
+    average = int(sumValues / len(sentenceValue))
+
+    summary = ''
+    for sentence in sentences:
+        if (sentence in sentenceValue) and (sentenceValue[sentence] > (magnitude * average)):
+            summary += " " + sentence
+
+    return summary
+
+
+def calculate_string_similarity(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def read(pointer_name):
+    content = ""
+    point = storage_fldr + "\\" + config[pointer_name]
+    with open(point, 'r') as file:
+        for line in file:
+            content += line.replace("\n", "|")
+    return content
+
+def write(pointer_name, content):
+    content = content.strip()
+    point = storage_fldr + "\\" + config[pointer_name]
+    with open(point, 'a') as file:
+        log("Added " + content + " to database.")
+        file.write(content + "\n")
+
+
+vendors = read("vendor_list")
+identifiers = read("identifier_list")
+
+valid_dates = []
+
+def find_dates(str):
+    raw = dateparser.parse(str, date_formats=['%y-%m-%d %H:%M:%S %Z'])
+    if raw == None: return None
+    raw_tt = raw.timetuple()
+    now_tt = datetime.date.today().timetuple()
+    if raw_tt.tm_yday <= now_tt.tm_yday or ((raw_tt.tm_yday - now_tt.tm_yday) + 365) % 365 > 21 or valid_dates.__contains__(raw):
+        return None
+
+    valid_dates.append(raw)
+    
+
+def to_string(l):
+    return ('%-2s ' * len(l))[:-1] % tuple(l)
 
 def log(str):
-    with open(log_file, 'a') as log:
+    with open(parent_fldr + config["log"], 'a') as log:
         msg = "[" + datetime.datetime.now().strftime("%Y-%m-%d, %H:%M:%S") + "]: " + str + "\n"
-        log.write(msg)
+        try:
+            log.write(msg)
+        except:
+            log.write("?")
 
 def press_key(key):
     try:

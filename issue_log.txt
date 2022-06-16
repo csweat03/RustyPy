@@ -1,0 +1,9 @@
+Dumb Inputs check for exact verbage over human language appropriate answers. Implement NLP
+Submit GCR function is not executing as expected.
+Macro is dumb and hardcoded, does not assess where it is in the GUI nor when is actually appropriate to run. Only runs on timer.
+Email extraction is very limited and dumb, no learning when it needs human input. Instead of dynamically getting "smarter"
+Allow for just city as input if cant find state param
+Decrease time after opening window wizard, waits for atleast 2 seconds too long
+Develop training script to look and process the currently selected text in the Vendor Name box.
+    Map out the names to the Vendor list for more appropriate assumption of Vendor name
+	Add Verbage to a seperate list to get number of presses down to select Vendor Name box.
